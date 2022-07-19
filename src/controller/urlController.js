@@ -53,13 +53,14 @@ const createUrl = async function (req, res) {
           if (!url) {
             return res.status(404).send({ status: false, message: 'No such urlCode found' })
           }
-          //return res.status(302).redirect(url.longUrl)
-          return res.status(302).send({message: `Found. redirected to ${url.longUrl}`})
+          return res.status(302).redirect(url.longUrl)
+        //   return res.status(302).send({message: `Found. redirected to ${url.longUrl}`})
           
         }
         catch (error) {
           return res.status(500).send({ status: false, message: error.message });
         }
       };
+      
 module.exports.createUrl=createUrl
 module.exports.getUrl=getUrl
