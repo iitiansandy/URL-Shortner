@@ -3,6 +3,33 @@ const validUrl = require('valid-url')
 const shortid = require('shortid')
 const {isValid,isValidBody,isValidUrl}= require("../validation/validation")
 
+const redis = require("redis");
+
+const { promisify } = require("util");
+
+//Connect to redis
+const redisClient = redis.createClient(
+  13221,
+  "redis-13221.c264.ap-south-1-1.ec2.cloud.redislabs.com",
+  { no_ready_check: true }
+);
+redisClient.auth("ATVcrAv33hlBmxIRFLORxy7p2GWijTiO", function (err) {
+  if (err) throw err;
+});
+
+redisClient.on("connect", async function () {
+  console.log("Connected to Redis..");
+});
+
+
+
+//1. connect to the server
+//2. use the commands :
+
+//Connection setup for redis
+
+const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
+const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
 
 const createUrl = async function (req, res) {
 
@@ -45,16 +72,25 @@ const createUrl = async function (req, res) {
 
     const getUrl = async function (req, res) {
         try {
-          let urlCode = req.params.urlCode
+          let urlCode = req.params.urlCode;
 
-          if(!shortid.isValid(urlCode)) return res.status(400).send({status:false,message:"Pls Enter Urlcode In valid Format"})
-    
-          let url = await urlModel.findOne({ urlCode })
-          if (!url) {
-            return res.status(404).send({ status: false, message: 'No such urlCode found' })
+          if(!shortid.isValid(urlCode)) return res.status(400).send({status:false,message:"Pls Enter valid urlCode Format"});
+
+          let cachedUrl = await GET_ASYNC(`${urlCode}`);
+          if(cachedUrl) {
+            res.status(200).send(cachedUrl)
+          }else{
+            let url = await urlModel.findOne(urlCode)
+            await SET_ASYNC(`${urlCode}`, JSON.stringify(url))
+            res.status(302).send({ data: url })
           }
-          return res.status(302).redirect(url.longUrl)
-        //   return res.status(302).send({message: `Found. redirected to ${url.longUrl}`})
+    
+          // let url = await urlModel.findOne({ urlCode })
+          // if (!url) {
+          //   return res.status(404).send({ status: false, message: 'No such urlCode found' })
+          // }
+          // return res.status(302).redirect(url.longUrl)
+          // return res.status(302).send({message: `Found. redirected to ${url.longUrl}`})
           
         }
         catch (error) {
