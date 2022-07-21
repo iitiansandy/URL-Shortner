@@ -55,7 +55,7 @@ const createUrl = async function (req, res) {
           // console.log(cachedData)
           // console.log(typeof cachedData)
           check= JSON.parse(cachedData)
-        return res.status(201).send({ status: true, message:"Data coming from cache", data: check })}
+        return res.status(200).send({ status: true, message:"Data coming from cache", data: check })}
   
         if (!validUrl.isUri(baseUrl)) {
         return res.status(400).send({ status: false, message: 'invalid base URL' })
@@ -97,7 +97,7 @@ const createUrl = async function (req, res) {
              if (!url) {
                   return res.status(404).send({ status: false, message: 'No such shortUrl found' })
               }
-              //await SET_ASYNC(`${urlCode}`, JSON.stringify(url))
+              await SET_ASYNC(`${urlCode}`, JSON.stringify(url))
               return res.status(302).redirect(url.longUrl)
               }
 
