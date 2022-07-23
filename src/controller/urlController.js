@@ -1,6 +1,6 @@
 const urlModel = require("../model/urlModel")
 const validUrl = require('valid-url')
-const shortid = require('shortid')
+const shortId = require('shortId')
 const {isValid,isValidBody,isValidUrl}= require("../validation/validation")
 
 const redis = require("redis");
@@ -37,41 +37,32 @@ const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
 const createUrl = async function (req, res) {
 
   try {
-      const baseUrl = 'http://localhost:3000'
-      let body = req.body;
-      let { longUrl } = body;
+    const body = req.body
+    const { longUrl } = body
 
-      // if (Object.keys(body) == 0) return res.status(400).send({ status: false, message: 'please enter body' })
+    if (!isValidBody(body)) return res.status(400).send({ status: false, message: "Body Should not be empty" })
+    if (!("longUrl" in body)) return res.status(400).send({ status: false, message: "LongUrl Is required" })
+    
+    if (!isValid(longUrl)) return res.status(400).send({ status: false, message: "LongUrl Should not be empty" })
+    if (!isValidUrl(longUrl)) return res.status(400).send({ status: false, message: `"${longUrl}" is not a Valid url` })
 
-      if(!isValidBody(body)) return res.status(400).send({ status:false,message:"Body Should not be empty" }) 
-      if(!("longUrl" in body)) return res.status(400).send({ status:false,message:"LongUrl Is required" })
-      
-      if(!isValid(longUrl)) return res.status(400).send({ status:false, message: "LongUrl should not be empty" })
-      if(!isValidUrl(longUrl)) return res.status(400).send({ status:false, message: `${longUrl} is not a valid url` })
+    let cacheData = await GET_ASYNC(`${longUrl}`)
+    if (cacheData) {
+      cacheData = JSON.parse(cacheData)
+      if (cacheData) return res.status(200).send({ status: true, message: "Already created. Getting this data from the cache", data: cacheData })
+    } else {
+      let url = await urlModel.findOne({ longUrl: longUrl }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 })
+      if (url) return res.status(200).send({ status: true, message: "already created. getting this data from the database", data: url })
 
-    //  if (await urlModel.findOne({ longUrl })) {
-        let cachedData = await GET_ASYNC(`${longUrl}`)
-        if(cachedData){
-          // console.log(cachedData)
-          // console.log(typeof cachedData)
-          check= JSON.parse(cachedData)
-        return res.status(200).send({ status: true, message:"Data coming from cache", data: check })}
-  
-        if (!validUrl.isUri(baseUrl)) {
-        return res.status(400).send({ status: false, message: 'invalid base URL' })
-      }
-  
-      const urlCode = shortid.generate();
-      body.urlCode = urlCode
-  
-      if (validUrl.isUri(longUrl)) {
-        const shortUrl = baseUrl + '/' + urlCode
-        body.shortUrl = shortUrl
-      }
-      let Data = await urlModel.create(body)
-      let saveData= await urlModel.findOne({longUrl:longUrl}).select({_id:0,createdAt:0,updatedAt:0,__v:0})
-      await SET_ASYNC(`${longUrl}`, JSON.stringify(saveData))
-      return res.status(201).send({ status: true,message:"Data coming from db", data: saveData })
+      shortId.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_=');
+      let smallId = shortId.generate(longUrl)
+      body.urlCode = smallId
+      body.shortUrl = "https://localhost:3000/" + smallId
+      let data = await urlModel.create(body)
+      let selecteddata = { longUrl: data.longUrl, shortUrl: data.shortUrl, urlCode: data.urlCode }
+      await SET_ASYNC(`${longUrl}`, JSON.stringify(selecteddata), 'ex', 60 * 1)
+      res.status(201).send({ status: true, message: "Done", data: selecteddata })
+    }
   
     } catch (error) {
       return res.status(500).send({ status: false,message: error.message });
